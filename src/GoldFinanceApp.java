@@ -1,147 +1,105 @@
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 public class GoldFinanceApp extends JFrame {
-    private FinanceManager manager;
-    private DefaultListModel<Transaction> model;
-    private JList<Transaction> list;
-    private JTextField dateField, descField, amountField;
-    private JComboBox<String> typeBox;
-    private JLabel totalLabel;
+    private final FinanceManager financeManager;
+    private final JTextField txtDate, txtDescription, txtAmount;
+    private final JComboBox<String> cbType;
+    private final JLabel lblBalance;
+    private final DefaultTableModel tableModel;
 
     public GoldFinanceApp() {
-        manager = new FinanceManager();
-        model = new DefaultListModel<>();
+        financeManager = new FinanceManager();
 
-        setTitle("💰 GoldFinance — Keuangan Pribadi Elegan");
-        setSize(600, 500);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setTitle("GoldFinance — Keuangan Pribadi Elegan");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(650, 450);
         setLocationRelativeTo(null);
-        setLayout(new BorderLayout());
 
-        // === HEADER PANEL (warna emas) ===
-        JPanel header = new JPanel();
-        header.setBackground(new Color(255, 215, 0));
-        JLabel title = new JLabel("💎 GoldFinance — Catatan Keuangan Pribadi");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        header.add(title);
-        add(header, BorderLayout.NORTH);
+        // Panel utama
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(new Color(255, 250, 230));
+        add(panel);
 
-        // === FORM INPUT ===
-        JPanel form = new JPanel(new GridLayout(5, 2, 8, 8));
-        form.setBackground(new Color(255, 248, 225));
-        form.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        // --- Panel input ---
+        JPanel inputPanel = new JPanel(new GridLayout(5, 2, 8, 8));
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        inputPanel.setBackground(new Color(255, 250, 230));
 
-        form.add(new JLabel("Tanggal (YYYY-MM-DD):"));
-        dateField = new JTextField();
-        form.add(dateField);
+        inputPanel.add(new JLabel("Tanggal (YYYY-MM-DD):"));
+        txtDate = new JTextField();
+        inputPanel.add(txtDate);
 
-        form.add(new JLabel("Keterangan:"));
-        descField = new JTextField();
-        form.add(descField);
+        inputPanel.add(new JLabel("Keterangan:"));
+        txtDescription = new JTextField();
+        inputPanel.add(txtDescription);
 
-        form.add(new JLabel("Jumlah (Rp):"));
-        amountField = new JTextField();
-        form.add(amountField);
+        inputPanel.add(new JLabel("Jumlah (Rp):"));
+        txtAmount = new JTextField();
+        inputPanel.add(txtAmount);
 
-        form.add(new JLabel("Tipe Transaksi:"));
-        typeBox = new JComboBox<>(new String[]{"Pemasukan", "Pengeluaran"});
-        form.add(typeBox);
+        inputPanel.add(new JLabel("Tipe Transaksi:"));
+        cbType = new JComboBox<>(new String[]{"Pemasukan", "Pengeluaran"});
+        inputPanel.add(cbType);
 
-        JButton addBtn = new JButton("Tambah");
-        JButton updateBtn = new JButton("Ubah");
-        JButton deleteBtn = new JButton("Hapus");
+        JButton btnAdd = new JButton("Tambah Transaksi");
+        btnAdd.addActionListener(e -> addTransaction());
+        inputPanel.add(btnAdd);
 
-        JPanel btnPanel = new JPanel(new FlowLayout());
-        btnPanel.add(addBtn);
-        btnPanel.add(updateBtn);
-        btnPanel.add(deleteBtn);
+        panel.add(inputPanel, BorderLayout.NORTH);
 
-        // === LIST PANEL ===
-        list = new JList<>(model);
-        list.setBackground(new Color(255, 253, 245));
-        list.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        JScrollPane scroll = new JScrollPane(list);
+        // --- Tabel histori transaksi ---
+        String[] columns = {"Tanggal", "Keterangan", "Jumlah (Rp)", "Tipe"};
+        tableModel = new DefaultTableModel(columns, 0);
+        JTable table = new JTable(tableModel);
+        JScrollPane scrollPane = new JScrollPane(table);
+        panel.add(scrollPane, BorderLayout.CENTER);
 
-        // === FOOTER TOTAL ===
-        JPanel footer = new JPanel();
-        footer.setBackground(new Color(255, 248, 225));
-        totalLabel = new JLabel("Total Saldo: Rp 0");
-        totalLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        footer.add(totalLabel);
-
-        add(form, BorderLayout.NORTH);
-        add(scroll, BorderLayout.CENTER);
-        add(btnPanel, BorderLayout.SOUTH);
-        add(footer, BorderLayout.PAGE_END);
-
-        // === EVENT HANDLER ===
-        addBtn.addActionListener(e -> {
-            try {
-                Transaction t = new Transaction(
-                        dateField.getText(),
-                        descField.getText(),
-                        Double.parseDouble(amountField.getText()),
-                        typeBox.getSelectedItem().toString());
-                manager.addTransaction(t);
-                model.addElement(t);
-                updateTotal();
-                clearFields();
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Input tidak valid!");
-            }
-        });
-
-        updateBtn.addActionListener(e -> {
-            int index = list.getSelectedIndex();
-            if (index != -1) {
-                Transaction t = new Transaction(
-                        dateField.getText(),
-                        descField.getText(),
-                        Double.parseDouble(amountField.getText()),
-                        typeBox.getSelectedItem().toString());
-                manager.updateTransaction(index, t);
-                model.setElementAt(t, index);
-                updateTotal();
-                clearFields();
-            }
-        });
-
-        deleteBtn.addActionListener(e -> {
-            int index = list.getSelectedIndex();
-            if (index != -1) {
-                manager.deleteTransaction(index);
-                model.remove(index);
-                updateTotal();
-                clearFields();
-            }
-        });
-
-        list.addListSelectionListener(e -> {
-            Transaction t = list.getSelectedValue();
-            if (t != null) {
-                dateField.setText(t.getDate());
-                descField.setText(t.getDescription());
-                amountField.setText(String.valueOf(t.getAmount()));
-                typeBox.setSelectedItem(t.getType());
-            }
-        });
-
-        setVisible(true);
+        // --- Label saldo ---
+        lblBalance = new JLabel("Total Saldo: Rp 0", SwingConstants.CENTER);
+        lblBalance.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lblBalance.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        panel.add(lblBalance, BorderLayout.SOUTH);
     }
 
-    private void updateTotal() {
-        totalLabel.setText("Total Saldo: Rp " + manager.getTotalBalance());
-    }
+    private void addTransaction() {
+        try {
+            LocalDate date = LocalDate.parse(txtDate.getText().trim());
+            String desc = txtDescription.getText().trim();
+            double amount = Double.parseDouble(txtAmount.getText().trim());
+            String type = (String) cbType.getSelectedItem();
 
-    private void clearFields() {
-        dateField.setText("");
-        descField.setText("");
-        amountField.setText("");
+            Transaction transaction = new Transaction(date, desc, amount, type);
+            financeManager.addTransaction(transaction);
+
+            // Tambahkan ke tabel
+            tableModel.addRow(new Object[]{
+                    transaction.getDate(),
+                    transaction.getDescription(),
+                    String.format("Rp %, .0f", transaction.getAmount()),
+                    transaction.getType()
+            });
+
+            // Update saldo
+            double total = financeManager.getTotalBalance();
+            lblBalance.setText(String.format("Total Saldo: Rp %, .0f", total));
+
+            // Bersihkan input
+            txtDescription.setText("");
+            txtAmount.setText("");
+
+        } catch (DateTimeParseException ex) {
+            JOptionPane.showMessageDialog(this, "Format tanggal salah! Gunakan YYYY-MM-DD.", "Error", JOptionPane.ERROR_MESSAGE);
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Jumlah harus berupa angka!", "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(GoldFinanceApp::new);
+        SwingUtilities.invokeLater(() -> new GoldFinanceApp().setVisible(true));
     }
 }
+
